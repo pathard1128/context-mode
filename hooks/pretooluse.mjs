@@ -164,7 +164,9 @@ await runHook(async () => {
   const tool = input.tool_name ?? "";
   const toolInput = input.tool_input ?? {};
   const projectDir = getInputProjectDir(input);
-  const isSubagentContext = input.agent_id != null || input.agent_type != null;
+  // Only agent_id identifies a subagent. Claude Code also sends agent_type for
+  // main sessions started with --agent (or "agent" in settings.json).
+  const isSubagentContext = input.agent_id != null;
 
   // ─── Route and format response ───
   const decision = routePreToolUse(tool, toolInput, projectDir, "claude-code", getSessionId(input), {

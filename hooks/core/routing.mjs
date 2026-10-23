@@ -708,7 +708,10 @@ export function routePreToolUse(toolName, toolInput, projectDir, platform, sessi
     // Only act when an explicit pattern matched. When no pattern matches,
     // evaluateCommand returns { decision: "ask" } with no matchedPattern —
     // in that case fall through so other hooks and the platform's native engine can decide.
-    if (security) {
+    // Skipped on Claude Code: its native permission engine already enforces these
+    // same settings rules with real shell parsing, while this text matcher also
+    // fires on quoted/heredoc text (e.g. a commit message mentioning "git clean").
+    if (security && platform !== "claude-code") {
       const policies = security.readBashPolicies(projectDir, platformSettingsPath);
       if (policies.length > 0) {
         const result = security.evaluateCommand(command, policies);

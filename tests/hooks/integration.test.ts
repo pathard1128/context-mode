@@ -461,15 +461,16 @@ describe("Security Policy Enforcement", () => {
     try { rmSync(MOCK_PROJECT_DIR, { recursive: true, force: true }); } catch {}
   });
 
-  test("Security: Bash + sudo denied by deny pattern", () => {
+  test("Security: Bash deny patterns are left to Claude Code's native permission engine", () => {
+    // Claude Code enforces settings deny/ask rules natively with real shell
+    // parsing, so the hook does not re-match them against raw command text.
     const result = runHook(
       { tool_name: "Bash", tool_input: { command: "sudo apt install vim" } },
       secEnv,
     );
     assert.equal(result.exitCode, 0);
-    const parsed = JSON.parse(result.stdout);
-    assert.equal(parsed.hookSpecificOutput.permissionDecision, "deny");
-    assert.ok(parsed.hookSpecificOutput.permissionDecisionReason.includes("deny pattern"));
+    const parsed = result.stdout ? JSON.parse(result.stdout) : {};
+    assert.notEqual(parsed.hookSpecificOutput?.permissionDecision, "deny");
   });
 
   test("Security: Bash + git allowed, falls through to Stage 2", () => {

@@ -490,6 +490,17 @@ describe("routePreToolUse", () => {
       expect(subagent.status).toBe(0);
       expect(subagent.stdout).toBe("");
     });
+
+    it("Claude Code pretooluse keeps routing for --agent main sessions (agent_type without agent_id)", async () => {
+      const mainWithAgent = await spawnPreToolUseHook({
+        tool_name: "Bash",
+        tool_input: { command: "curl -s https://example.com" },
+        session_id: "core-routing-main-agent-type-curl",
+        agent_type: "my-agent",
+      });
+      expect(mainWithAgent.status).toBe(0);
+      expect(mainWithAgent.parsed?.hookSpecificOutput?.permissionDecision).toBe("deny");
+    });
   });
 
   // ─── MCP readiness: all redirects degrade gracefully (#230) ───
@@ -715,6 +726,38 @@ describe("routePreToolUse", () => {
       const result = routePreToolUse(toolName, toolInput, projectDir);
       expect(result?.action).toBe("deny");
       expect(result?.reason).toContain("deny pattern");
+    });
+  });
+
+  describe("Bash Stage 1 settings policy on Claude Code", () => {
+    let projectDir: string;
+
+    beforeAll(async () => {
+      await initSecurity(resolve(process.cwd(), "build"));
+    });
+
+    beforeEach(() => {
+      projectDir = mkdtempSync(join(tmpdir(), "ctx-cc-stage1-"));
+      mkdirSync(join(projectDir, ".claude"), { recursive: true });
+      writeFileSync(
+        join(projectDir, ".claude", "settings.local.json"),
+        JSON.stringify({ permissions: { deny: ["Bash(git clean *)"] } }),
+        "utf-8",
+      );
+    });
+
+    afterEach(() => {
+      try { rmSync(projectDir, { recursive: true, force: true }); } catch {}
+    });
+
+    it("leaves Bash deny patterns to Claude Code's native engine (no text match on quoted args)", () => {
+      const command = 'git commit -m "docs: explain git clean usage"';
+      const cc = routePreToolUse("Bash", { command }, projectDir, "claude-code", "cc-stage1");
+      expect(cc?.action).not.toBe("deny");
+
+      const other = routePreToolUse("Bash", { command: "git clean -fd" }, projectDir, "cursor", "cursor-stage1");
+      expect(other?.action).toBe("deny");
+      expect(other?.reason).toContain("deny pattern");
     });
   });
 
